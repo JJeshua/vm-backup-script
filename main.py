@@ -1,6 +1,8 @@
 import os
 import shutil
 from datetime import datetime, timedelta
+import subprocess
+from time import sleep
 
 
 SOURCE_VMS_FOLDER_PATH = r"C:\Users\admin\Desktop\Start"
@@ -25,6 +27,9 @@ class Folder:
         if not self.name:
             raise ValueError("Folder name or datetime is null")
         return f"{self.parent_path}\\{self.name}"
+
+    def generate_archive_folder_name(self):
+        return f"{self.name}_{self.current_datetime}.7z"
 
     def is_older_than_30_days(self):
         current_datetime = datetime.now()
@@ -105,20 +110,56 @@ def get_folders_from_path(directory):
         return []
 
 
-def copy_folder_with_datetime(source_folder, destination_folder):
-    try:
-        # Ensure the source folder exists
-        if not os.path.exists(source_folder):
-            raise ValueError(f"Source folder '{source_folder}' does not exist.")
+def archive_folder(source_folder: Folder):
 
-        # Copy the folder and its contents
-        shutil.copytree(source_folder, destination_folder)
-        print(
-            f"(COPY) Folder [{source_folder}] has been copied to [{destination_folder}]."
+    seven_zip_path = r"C:\Program Files\7-Zip\7z.exe"
+
+    # attempting to archive a folder that is not in the specified source path
+    if source_folder.parent_path != SOURCE_VMS_FOLDER_PATH:
+        raise RuntimeError(
+            f"(ERROR) Attempted to archive folder {source_folder.generate_source_full_folder_path()} not in {SOURCE_VMS_FOLDER_PATH}"
         )
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    # Ensure the source folder exists
+    source_folder_full_path = source_folder.generate_source_full_folder_path()
+    print(source_folder_full_path)
+    if not os.path.exists(source_folder_full_path):
+        raise ValueError(f"Source folder '{source_folder_full_path}' does not exist.")
+
+    # Start the 7-Zip process in the background
+    process = subprocess.Popen(
+        [
+            seven_zip_path,
+            "a",
+            source_folder.generate_archive_folder_name(),
+            source_folder_full_path,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    print(
+        f"Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+    )
+
+    # Monitor the process
+    while process.poll() is None:
+        print("Archiving in progress...")
+        sleep(5)  # Wait for 5 seconds before checking again
+
+    # Check for errors
+    stdout, stderr = process.communicate()
+    if process.returncode == 0:
+        print(
+            f"Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+        )
+    else:
+        print(f"Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
+
+    # # Copy the folder and its contents
+    # shutil.copytree(source_folder, destination_folder)
+    # print(
+    #     f"(COPY) Folder [{source_folder}] has been copied to [{destination_folder}]."
+    # )
 
 
 skip = []
@@ -145,7 +186,4 @@ for folder in folders_to_be_backed_up:
         continue
 
     folder.set_datetime_to_current_datetime()
-    copy_folder_with_datetime(
-        folder.generate_source_full_folder_path(),
-        folder.generate_destination_full_folder_path(),
-    )
+    archive_folder(folder)
