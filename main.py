@@ -42,6 +42,8 @@ class Folder:
     def calculate_age_in_days_hours_and_seconds(self):
         # Parse the input date string to a datetime object
         input_date = self.current_datetime
+        if not input_date:
+            raise RuntimeError(f"\n(ERROR) {self} does not have a datetime")
 
         # Get the current date and time
         current_datetime = datetime.now()
@@ -69,45 +71,45 @@ class Folder:
         self.destination_path = path
 
     def parse_folder_name_and_datetime(self):
-        try:
-            # Split the folder name by the last underscore
-            base_name, datetime_str = self.name.rsplit("_", 1)
-            # Convert the datetime string to a datetime object
-            folder_datetime = datetime.strptime(datetime_str, "%Y%m%d%H%M%S")
-            self.name = base_name
-            self.current_datetime = folder_datetime
-
+        # Check if the name ends with .7z
+        if "_" not in self.name:
             return
+        elif self.name.endswith(".7z"):
+            # Remove the .7z extension
+            base_name_with_datetime = self.name[:-3]
+        else:
+            base_name_with_datetime = self.name
 
-        # If the folder does not have a datetime suffix, do nothing
-        except (IndexError, ValueError):
-            return
+        # Split the folder name by the last underscore
+        base_name, datetime_str = base_name_with_datetime.rsplit("_", 1)
+
+        # Convert the datetime string to a datetime object
+        folder_datetime = datetime.strptime(datetime_str, "%Y%m%d%H%M%S")
+
+        # Update the name and datetime attributes
+        self.name = base_name
+        self.current_datetime = folder_datetime
 
     def get_datetime_of_folder(self):
         return self.current_datetime
 
     def __str__(self):
-        return f"Name: {self.name}\nParent Path: {self.parent_path}\nDestination Path: {self.destination_path}\nFolder Datetime: {self.current_datetime}"
+        return f"Name: {self.name}\nParent Path: {self.parent_path}\nDestination Path: {self.destination_path}\nFolder Datetime: {self.current_datetime}\n"
 
 
 def get_folders_from_path(directory):
-    try:
-        # List to store folder names
-        folders = []
+    # List to store folder names
+    folders = []
 
-        # Iterate through the items in the given directory
-        for item in os.listdir(directory):
-            # Create the full path to the item
-            item_path = os.path.join(directory, item)
-            # Check if the item is a directory
-            if os.path.isdir(item_path):
-                folders.append(Folder(item, directory))
+    # Iterate through the items in the given directory
+    for item in os.listdir(directory):
+        # Create the full path to the item
+        item_path = os.path.join(directory, item)
+        # Check if the item is a directory
+        if os.path.isdir(item_path) or item.lower().endswith("7z"):
+            folders.append(Folder(item, directory))
 
-        return folders
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return []
+    return folders
 
 
 def archive_folder(source_folder: Folder):
@@ -171,7 +173,7 @@ def main():
         days, hours, minutes, seconds = folder.calculate_age_in_days_hours_and_seconds()
         if folder.is_younger_than_7_days():
             print(
-                f"(SKIPPING) [{folder.name}] \t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
+                f"(SKIPPING) [{folder.name}] \t\t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
             )
             skip.append(folder.name)
 
@@ -179,7 +181,6 @@ def main():
     for folder in folders_to_be_backed_up:
         folder.set_destination_path(DESTINATION_FOLDER_PATH)
 
-    for folder in folders_to_be_backed_up:
         if folder.name in skip:
             continue
 
