@@ -7,6 +7,7 @@ from time import sleep
 
 SOURCE_VMS_FOLDER_PATH = r"C:\Users\admin\Desktop\Start"
 DESTINATION_FOLDER_PATH = r"C:\Users\admin\Desktop\Destination"
+SEVEN_ZIP_PATH = r"C:\Program Files\7-Zip\7z.exe"
 
 
 class Folder:
@@ -112,28 +113,24 @@ def get_folders_from_path(directory):
     return folders
 
 
-def archive_folder(source_folder: Folder):
-
-    seven_zip_path = r"C:\Program Files\7-Zip\7z.exe"
-
-    # attempting to archive a folder that is not in the specified source path
+def validate_folder(source_folder: Folder):
+    source_folder_full_path = source_folder.generate_source_full_folder_path()
     if source_folder.parent_path != SOURCE_VMS_FOLDER_PATH:
         raise RuntimeError(
-            f"(ERROR) Attempted to archive folder {source_folder.generate_source_full_folder_path()} not in {SOURCE_VMS_FOLDER_PATH}"
+            f"(ERROR) Attempted to archive folder {source_folder_full_path} not in {SOURCE_VMS_FOLDER_PATH}"
         )
-
-    # Ensure the source folder exists
-    source_folder_full_path = source_folder.generate_source_full_folder_path()
     if not os.path.exists(source_folder_full_path):
         raise ValueError(f"Source folder '{source_folder_full_path}' does not exist.")
+    return source_folder_full_path
 
-    # Start the 7-Zip process in the background
+
+def start_archive_process(seven_zip_path, source_folder: Folder):
     process = subprocess.Popen(
         [
             seven_zip_path,
             "a",
-            source_folder.generate_archive_folder_name(),
-            source_folder_full_path,
+            source_folder.generate_destination_full_folder_path(),
+            source_folder.generate_source_full_folder_path(),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -141,13 +138,13 @@ def archive_folder(source_folder: Folder):
     print(
         f"(ARCHIVING) Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
     )
+    return process
 
-    # Monitor the process
+
+def monitor_archive_process(process, source_folder: Folder):
     while process.poll() is None:
         print("(IN PROGRESS) Archiving in progress...")
         sleep(5)  # Wait for 5 seconds before checking again
-
-    # Check for errors
     stdout, stderr = process.communicate()
     if process.returncode == 0:
         print(
@@ -156,11 +153,11 @@ def archive_folder(source_folder: Folder):
     else:
         print(f"(ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
 
-    # # Copy the folder and its contents
-    # shutil.copytree(source_folder, destination_folder)
-    # print(
-    #     f"(COPY) Folder [{source_folder}] has been copied to [{destination_folder}]."
-    # )
+
+def archive_folder(source_folder: Folder):
+    validate_folder(source_folder)
+    process = start_archive_process(SEVEN_ZIP_PATH, source_folder)
+    monitor_archive_process(process, source_folder)
 
 
 def main():
@@ -177,6 +174,9 @@ def main():
             )
             skip.append(folder.name)
 
+    # backup each of the folders in the source directory.
+    # skip the folder if it is in the skip list.
+    # we first archive the folder with 7 zip.
     folders_to_be_backed_up = get_folders_from_path(SOURCE_VMS_FOLDER_PATH)
     for folder in folders_to_be_backed_up:
         folder.set_destination_path(DESTINATION_FOLDER_PATH)
