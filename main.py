@@ -122,7 +122,6 @@ def archive_folder(source_folder: Folder):
 
     # Ensure the source folder exists
     source_folder_full_path = source_folder.generate_source_full_folder_path()
-    print(source_folder_full_path)
     if not os.path.exists(source_folder_full_path):
         raise ValueError(f"Source folder '{source_folder_full_path}' does not exist.")
 
@@ -138,22 +137,22 @@ def archive_folder(source_folder: Folder):
         stderr=subprocess.PIPE,
     )
     print(
-        f"Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+        f"(ARCHIVING) Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
     )
 
     # Monitor the process
     while process.poll() is None:
-        print("Archiving in progress...")
+        print("(ARCHIVING IN PROGRESS) Archiving in progress...")
         sleep(5)  # Wait for 5 seconds before checking again
 
     # Check for errors
     stdout, stderr = process.communicate()
     if process.returncode == 0:
         print(
-            f"Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+            f"(ARCHIVING DONE)Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
         )
     else:
-        print(f"Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
+        print(f"(ARCHIVING ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
 
     # # Copy the folder and its contents
     # shutil.copytree(source_folder, destination_folder)
@@ -162,28 +161,31 @@ def archive_folder(source_folder: Folder):
     # )
 
 
-skip = []
+def main():
+    skip = []
 
-# check the age of already backed up folders.
-# skip if they are young.
-current_backed_up_folders = get_folders_from_path(DESTINATION_FOLDER_PATH)
-for folder in current_backed_up_folders:
-    days, hours, minutes, seconds = folder.calculate_age_in_days_hours_and_seconds()
-    if folder.is_younger_than_7_days():
-        print(
-            f"(SKIPPING) [{folder.name}] \t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
-        )
-        skip.append(folder.name)
+    # check the age of already backed up folders.
+    # skip if they are young.
+    current_backed_up_folders = get_folders_from_path(DESTINATION_FOLDER_PATH)
+    for folder in current_backed_up_folders:
+        days, hours, minutes, seconds = folder.calculate_age_in_days_hours_and_seconds()
+        if folder.is_younger_than_7_days():
+            print(
+                f"(SKIPPING) [{folder.name}] \t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
+            )
+            skip.append(folder.name)
+
+    folders_to_be_backed_up = get_folders_from_path(SOURCE_VMS_FOLDER_PATH)
+    for folder in folders_to_be_backed_up:
+        folder.set_destination_path(DESTINATION_FOLDER_PATH)
+
+    for folder in folders_to_be_backed_up:
+        if folder.name in skip:
+            continue
+
+        folder.set_datetime_to_current_datetime()
+        archive_folder(folder)
 
 
-folders_to_be_backed_up = get_folders_from_path(SOURCE_VMS_FOLDER_PATH)
-for folder in folders_to_be_backed_up:
-    folder.set_destination_path(DESTINATION_FOLDER_PATH)
-
-
-for folder in folders_to_be_backed_up:
-    if folder.name in skip:
-        continue
-
-    folder.set_datetime_to_current_datetime()
-    archive_folder(folder)
+if __name__ == "__main__":
+    main()
