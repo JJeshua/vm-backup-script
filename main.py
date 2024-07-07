@@ -142,17 +142,17 @@ def archive_folder(source_folder: Folder):
 
     # Monitor the process
     while process.poll() is None:
-        print("(ARCHIVING IN PROGRESS) Archiving in progress...")
+        print("(IN PROGRESS) Archiving in progress...")
         sleep(5)  # Wait for 5 seconds before checking again
 
     # Check for errors
     stdout, stderr = process.communicate()
     if process.returncode == 0:
         print(
-            f"(ARCHIVING DONE)Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+            f"(DONE) Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
         )
     else:
-        print(f"(ARCHIVING ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
+        print(f"(ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
 
     # # Copy the folder and its contents
     # shutil.copytree(source_folder, destination_folder)
