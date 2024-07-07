@@ -154,7 +154,7 @@ def monitor_archive_process(process, source_folder: Folder):
         print(f"(ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
 
 
-def archive_folder(source_folder: Folder):
+def backup_folder(source_folder: Folder):
     validate_folder(source_folder)
     process = start_archive_process(SEVEN_ZIP_PATH, source_folder)
     monitor_archive_process(process, source_folder)
@@ -185,7 +185,7 @@ def main():
             continue
 
         folder.set_datetime_to_current_datetime()
-        archive_folder(folder)
+        backup_folder(folder)
 
 
 if __name__ == "__main__":
