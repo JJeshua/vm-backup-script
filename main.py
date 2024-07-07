@@ -1,18 +1,30 @@
 import os
+import shutil
 from datetime import datetime, timedelta
 
 
-ALL_VMS_FOLDER_PATH = r"C:\Users\admin\Desktop\Start"
+SOURCE_VMS_FOLDER_PATH = r"C:\Users\admin\Desktop\Start"
 DESTINATION_FOLDER_PATH = r"C:\Users\admin\Desktop\Destination"
 
 
 class Folder:
-    def __init__(self, name, parent_path):
+    def __init__(self, name, parent_path, destination_path=None):
         self.name = name
         self.parent_path = parent_path
+        self.destination_path = destination_path
         self.current_datetime = None
 
         self.parse_folder_name_and_datetime()
+
+    def generate_destination_full_folder_path(self):
+        if not self.name or not self.current_datetime:
+            raise ValueError("Folder name or datetime is null")
+        return f"{self.destination_path}\\{self.name}_{self.current_datetime}"
+
+    def generate_source_full_folder_path(self):
+        if not self.name:
+            raise ValueError("Folder name or datetime is null")
+        return f"{self.parent_path}\\{self.name}"
 
     def is_older_than_30_days(self):
         current_datetime = datetime.now()
@@ -22,6 +34,9 @@ class Folder:
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("%Y%m%d%H%M%S")
         self.current_datetime = formatted_datetime
+
+    def set_destination_path(self, path):
+        self.destination_path = path
 
     def parse_folder_name_and_datetime(self):
         try:
@@ -42,7 +57,7 @@ class Folder:
         return self.current_datetime
 
     def __str__(self):
-        return f"Name: {self.name}\nParent Path: {self.parent_path}\nFolder Datetime: {self.current_datetime}"
+        return f"Name: {self.name}\nParent Path: {self.parent_path}\nDestination Path: {self.destination_path}\nFolder Datetime: {self.current_datetime}"
 
 
 def get_folders_from_path(directory):
@@ -65,10 +80,28 @@ def get_folders_from_path(directory):
         return []
 
 
-# Check the already backed up folders to see if they are older than 30 days
-backed_up_folders = get_folders_from_path(DESTINATION_FOLDER_PATH)
+def copy_folder_with_datetime(source_folder, destination_folder):
+    try:
+        # Ensure the source folder exists
+        if not os.path.exists(source_folder):
+            raise ValueError(f"Source folder '{source_folder}' does not exist.")
+
+        # Copy the folder and its contents
+        shutil.copytree(source_folder, destination_folder)
+        print(f"Folder '{source_folder}' has been copied to '{destination_folder}'.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
-for folder in backed_up_folders:
-    print(folder)
-    print("----------------------------------------")
+folders_to_be_backed_up = get_folders_from_path(SOURCE_VMS_FOLDER_PATH)
+for folder in folders_to_be_backed_up:
+    folder.set_destination_path(DESTINATION_FOLDER_PATH)
+
+
+for folder in folders_to_be_backed_up:
+    folder.set_datetime_to_current_datetime()
+    copy_folder_with_datetime(
+        folder.generate_source_full_folder_path(),
+        folder.generate_destination_full_folder_path(),
+    )
