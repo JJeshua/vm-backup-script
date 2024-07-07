@@ -30,6 +30,31 @@ class Folder:
         current_datetime = datetime.now()
         return (current_datetime - self.current_datetime) > timedelta(days=30)
 
+    def is_younger_than_7_days(self):
+        current_datetime = datetime.now()
+        return (current_datetime - self.current_datetime) < timedelta(days=7)
+
+    def calculate_age_in_days_hours_and_seconds(self):
+        # Parse the input date string to a datetime object
+        input_date = self.current_datetime
+
+        # Get the current date and time
+        current_datetime = datetime.now()
+
+        # Calculate the difference
+        difference = current_datetime - input_date
+        total_seconds = difference.total_seconds()
+
+        # Calculate days, hours, and seconds
+        days = int(total_seconds // (24 * 3600))
+        remaining_seconds = total_seconds % (24 * 3600)
+        hours = int(remaining_seconds // 3600)
+        remaining_seconds %= 3600
+        minutes = int(remaining_seconds // 60)
+        seconds = int(remaining_seconds % 60)
+
+        return days, hours, minutes, seconds
+
     def set_datetime_to_current_datetime(self):
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("%Y%m%d%H%M%S")
@@ -45,7 +70,7 @@ class Folder:
             # Convert the datetime string to a datetime object
             folder_datetime = datetime.strptime(datetime_str, "%Y%m%d%H%M%S")
             self.name = base_name
-            self.current_datetime = datetime_str
+            self.current_datetime = folder_datetime
 
             return
 
@@ -88,10 +113,26 @@ def copy_folder_with_datetime(source_folder, destination_folder):
 
         # Copy the folder and its contents
         shutil.copytree(source_folder, destination_folder)
-        print(f"Folder '{source_folder}' has been copied to '{destination_folder}'.")
+        print(
+            f"(COPY) Folder [{source_folder}] has been copied to [{destination_folder}]."
+        )
 
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+skip = []
+
+# check the age of already backed up folders.
+# skip if they are young.
+current_backed_up_folders = get_folders_from_path(DESTINATION_FOLDER_PATH)
+for folder in current_backed_up_folders:
+    days, hours, minutes, seconds = folder.calculate_age_in_days_hours_and_seconds()
+    if folder.is_younger_than_7_days():
+        print(
+            f"(SKIPPING) [{folder.name}] \t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
+        )
+        skip.append(folder.name)
 
 
 folders_to_be_backed_up = get_folders_from_path(SOURCE_VMS_FOLDER_PATH)
@@ -100,6 +141,9 @@ for folder in folders_to_be_backed_up:
 
 
 for folder in folders_to_be_backed_up:
+    if folder.name in skip:
+        continue
+
     folder.set_datetime_to_current_datetime()
     copy_folder_with_datetime(
         folder.generate_source_full_folder_path(),
