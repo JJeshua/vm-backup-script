@@ -8,6 +8,8 @@ from time import sleep
 SOURCE_VMS_FOLDER_PATH = r"C:\Users\admin\Desktop\Start"
 DESTINATION_FOLDER_PATH = r"C:\Users\admin\Desktop\Destination"
 SEVEN_ZIP_PATH = r"C:\Program Files\7-Zip\7z.exe"
+YOUNGEST_AGE_THRESHOLD = 7
+OLDEST_AGE_THRESHOLD = 30
 
 
 class Folder:
@@ -22,7 +24,7 @@ class Folder:
     def generate_destination_full_folder_path(self):
         if not self.name or not self.current_datetime:
             raise ValueError("Folder name or datetime is null")
-        return f"{self.destination_path}\\{self.name}_{self.current_datetime}"
+        return f"{self.destination_path}\\{self.name}_{self.export_folder_datetime_to_string()}"
 
     def generate_source_full_folder_path(self):
         if not self.name:
@@ -30,13 +32,16 @@ class Folder:
         return f"{self.parent_path}\\{self.name}"
 
     def generate_archive_folder_name(self):
-        return f"{self.name}_{self.current_datetime}.7z"
+        return f"{self.name}_{self.export_folder_datetime_to_string()}.7z"
 
-    def is_older_than_30_days(self):
+    def generate_archive_full_path(self):
+        return f"{self.parent_path}\\{self.generate_archive_folder_name()}"
+
+    def is_older_than_old_age_threshold(self):
         current_datetime = datetime.now()
         return (current_datetime - self.current_datetime) > timedelta(days=30)
 
-    def is_younger_than_7_days(self):
+    def is_younger_than_young_age_threshold(self):
         current_datetime = datetime.now()
         return (current_datetime - self.current_datetime) < timedelta(days=7)
 
@@ -65,8 +70,10 @@ class Folder:
 
     def set_datetime_to_current_datetime(self):
         current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("%Y%m%d%H%M%S")
-        self.current_datetime = formatted_datetime
+        self.current_datetime = current_datetime
+
+    def export_folder_datetime_to_string(self):
+        return self.current_datetime.strftime("%Y%m%d%H%M%S")
 
     def set_destination_path(self, path):
         self.destination_path = path
@@ -117,7 +124,7 @@ def validate_folder(source_folder: Folder):
     source_folder_full_path = source_folder.generate_source_full_folder_path()
     if source_folder.parent_path != SOURCE_VMS_FOLDER_PATH:
         raise RuntimeError(
-            f"(ERROR) Attempted to archive folder {source_folder_full_path} not in {SOURCE_VMS_FOLDER_PATH}"
+            f"Attempted to archive folder {source_folder_full_path} not in {SOURCE_VMS_FOLDER_PATH}"
         )
     if not os.path.exists(source_folder_full_path):
         raise ValueError(f"Source folder '{source_folder_full_path}' does not exist.")
@@ -136,22 +143,22 @@ def start_archive_process(seven_zip_path, source_folder: Folder):
         stderr=subprocess.PIPE,
     )
     print(
-        f"(ARCHIVING) Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+        f"Started archiving {source_folder.name} as {source_folder.generate_archive_folder_name()}"
     )
     return process
 
 
 def monitor_archive_process(process, source_folder: Folder):
     while process.poll() is None:
-        print("(IN PROGRESS) Archiving in progress...")
+        print("Archiving in progress...")
         sleep(5)  # Wait for 5 seconds before checking again
     stdout, stderr = process.communicate()
     if process.returncode == 0:
         print(
-            f"(DONE) Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
+            f"Successfully archived {source_folder.name} as {source_folder.generate_archive_folder_name()}"
         )
     else:
-        print(f"(ERROR) Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
+        print(f"Error archiving {source_folder.name}: {stderr.decode('utf-8')}")
 
 
 def backup_folder(source_folder: Folder):
@@ -160,19 +167,49 @@ def backup_folder(source_folder: Folder):
     monitor_archive_process(process, source_folder)
 
 
+def delete_archive(folder: Folder):
+    """
+    Delete a .7z archive given the full path to the archive.
+
+    Parameters:
+    file_path (str): The full path to the .7z archive.
+    """
+    archive_folder_name = folder.generate_archive_folder_name()
+    archive_path = folder.generate_archive_full_path()
+    if not os.path.exists(archive_path) or not archive_folder_name.endswith(".7z"):
+        print(f"File {archive_path} does not exist or is not a .7z archive")
+
+    try:
+        os.remove(archive_path)
+        print(f"Deletion initiated for: {archive_path}")
+
+        while os.path.exists(archive_path):
+            sleep(5)
+
+        print(f"Successfully deleted: {archive_path}")
+    except Exception as e:
+        print(f"Error deleting file: {archive_path}\n{e}")
+
+
 def main():
     skip = []
 
-    # check the age of already backed up folders.
-    # skip if they are young.
+    # check the age of already backed up folders
+    # folder will be backed up if it is not too young
     current_backed_up_folders = get_folders_from_path(DESTINATION_FOLDER_PATH)
     for folder in current_backed_up_folders:
         days, hours, minutes, seconds = folder.calculate_age_in_days_hours_and_seconds()
-        if folder.is_younger_than_7_days():
+
+        # add the folder to the skip list if it is younger than the minimum age threshold
+        if folder.is_younger_than_young_age_threshold():
             print(
-                f"(SKIPPING) [{folder.name}] \t\t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
+                f"Skipping [{folder.name}] \t\t Already backed up {days}days {hours}hrs {minutes}mins {seconds}secs ago."
             )
             skip.append(folder.name)
+
+        # delete the folder if it is older than oldest age threshold
+        elif folder.is_older_than_old_age_threshold():
+            delete_archive(folder)
 
     # backup each of the folders in the source directory.
     # skip the folder if it is in the skip list.
